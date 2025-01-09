@@ -1,3 +1,4 @@
+import copy
 import re
 
 class Stratego:
@@ -149,6 +150,23 @@ class Stratego:
         self.switch_turn()
         print("Move executed successfully.")
 
+    def unmake_move(self, move):
+        """Undo the last move."""
+        if not self.history:
+            raise ValueError("No moves to undo.")
+
+        from_pos, to_pos, captured_piece = self.history.pop()
+        from_row, from_col = from_pos
+        to_row, to_col = to_pos
+
+        self.board[from_row][from_col] = self.board[to_row][to_col]
+        self.board[to_row][to_col] = captured_piece
+        self.switch_turn()
+
+    def clone(self):
+        """Create a deep copy of the current game state."""
+        return copy.deepcopy(self)
+
     def attack(self, from_pos, to_pos):
         attacker = self.board[from_pos[0]][from_pos[1]].split("_")[0]
         defender = self.board[to_pos[0]][to_pos[1]].split("_")[0]
@@ -193,6 +211,46 @@ class Stratego:
     def switch_turn(self):
         self.turn = "blue" if self.turn == "red" else "red"
 
+    def status(self):
+        """Return the status of the game."""
+        red_flag = any("FLAG_red" in cell for row in self.board for cell in row)
+        blue_flag = any("FLAG_blue" in cell for row in self.board for cell in row)
+
+        if not red_flag:
+            return "blue wins"
+        if not blue_flag:
+            return "red wins"
+
+        if not any("SCOUT_red" in cell or "SCOUT_blue" in cell for row in self.board for cell in row):
+            return "draw"
+
+        return "ongoing"
+
+    def encode(self):
+        """Encode the game state as a binary vector."""
+        vector = []
+        for row in self.board:
+            for cell in row:
+                if cell == "EMPTY":
+                    vector.extend([0] * 12)  # 12 pieces (including FLAG and BOMB)
+                else:
+                    piece, color = cell.split("_")
+                    piece_index = list(self.soldiers[color].keys()).index(piece)
+                    binary_piece = [1 if i == piece_index else 0 for i in range(12)]
+                    vector.extend(binary_piece)
+        vector.extend([1 if self.turn == "red" else 0])  # Turn indicator
+        return vector
+
+    def decode(self, action_index):
+        """Decode an action index into a move."""
+        total_positions = 100  # 10x10 board
+        from_index = action_index // total_positions
+        to_index = action_index % total_positions
+
+        from_pos = (from_index // 10, from_index % 10)
+        to_pos = (to_index // 10, to_index % 10)
+        return from_pos, to_pos
+
     def __str__(self):
         board_representation = "    " + " | ".join(map(str, range(10))) + "\n"
         board_representation += "   " + "-" * 31 + "\n"
@@ -228,6 +286,13 @@ def main():
             to_row = int(input("Enter the row to move to (0-9): "))
             to_col = int(input("Enter the column to move to (0-9): "))
             game.make_move((from_row, from_col), (to_row, to_col))
+            
+            # Check game status after each move
+            status = game.status()
+            if status != "ongoing":
+                print(f"Game Over! {status}")
+                break
+
         except ValueError as e:
             print(f"Error: {e}")
             continue
