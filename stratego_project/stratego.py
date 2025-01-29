@@ -115,7 +115,6 @@ class Stratego:
         from_row, from_col = from_pos
         to_row, to_col = to_pos
         piece = self.board[from_row][from_col]
-        print(f"move is from {from_pos} to {to_pos}")
         if not self.is_legal_move(from_pos, to_pos):
             raise ValueError("Illegal move.")
         if self.board[to_row][to_col] != "EMPTY":
@@ -190,7 +189,16 @@ class Stratego:
             return False
         if piece.split("_")[0] != "SCOUT" and abs(from_row - to_row) + abs(from_col - to_col) != 1:
             return False
+        if self.is_repetitive_move(from_pos, to_pos):
+            return False
         return True
+
+    def is_repetitive_move(self, from_pos, to_pos):
+        if len(self.history) < 7:
+            return False
+        last_moves = self.history[-6:]
+        last_moves = list(reversed(last_moves))
+        return (to_pos, from_pos) == last_moves[1] or (to_pos, from_pos) == last_moves[3] or (to_pos, from_pos) == last_moves[5]
 
     def legal_moves(self):
         """Calculate legal moves ensuring all moves are valid."""
