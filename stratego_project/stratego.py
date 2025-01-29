@@ -303,7 +303,7 @@ class Stratego:
 
     def __str__(self):
         """Visualize the board."""
-        board_representation = "    " + " | ".join(map(str, range(10))) + "\n"
+        board_representation = "    " + "  |  ".join(map(str, range(10))) + "\n"
         board_representation += "   " + "-" * 31 + "\n"
         for row_idx in range(10):
             row_str = f"{row_idx:2} | " + " | ".join(
