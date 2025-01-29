@@ -39,7 +39,24 @@ class MCTSPlayer:
         self.simulations = simulations
         self.exploration_weight = exploration_weight
 
+    def choose_best_move_based_on_probabilities(self, game, legal_moves):
+        prob_board = game.get_prob_board() 
+        best_move = None
+        best_score = -float("inf")
+        for move in legal_moves:
+            from_pos, to_pos = move
+            prob_distribution = prob_board[to_pos]      
+            attack_score = sum(prob_distribution[p] * game.soldiers[game.turn][p]["Rank"] for p in prob_distribution)
+            if attack_score > best_score:
+                best_score = attack_score
+                best_move = move
+        return best_move
+
     def choose_move(self, game):
+        legal_moves = game.legal_moves()
+        best_prob_move = self.choose_best_move_based_on_probabilities(game, legal_moves)
+        if best_prob_move:
+            return best_prob_move  
         root = MCTSNode(game.clone())
         for _ in range(self.simulations):
             node = self._select(root)
@@ -50,7 +67,8 @@ class MCTSPlayer:
         best_child = root.best_child(exploration_weight=0)
         if best_child:
             return best_child.move
-        return None
+
+        return None 
 
     def _select(self, node):
         while node.children and node.is_fully_expanded():
