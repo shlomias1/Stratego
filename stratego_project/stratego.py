@@ -46,6 +46,29 @@ class Stratego:
         self.pieces = {
             color: {name: {"quantity": 0, "owner": color} for name in self.soldiers[color]} for color in self.soldiers
         }
+        self.prob_board_red = {
+            (row, col): {piece: 0 for piece in self.soldiers["blue"].keys()} for row in range(10) for col in range(10)
+        }
+
+        self.prob_board_blue = {
+            (row, col): {piece: 0 for piece in self.soldiers["red"].keys()} for row in range(10) for col in range(10)
+        }
+        self.initialize_probabilities() 
+
+
+    def initialize_probabilities(self):
+        for row in range(10):
+            for col in range(10):
+                cell = self.board[row, col]
+                if cell != "EMPTY":
+                    piece, color = cell.split("_")
+                    if color == "red":
+                        self.prob_board_blue[(row, col)] = {p: 1 if p == piece else 0 for p in self.soldiers["red"].keys()}
+                    else:
+                        self.prob_board_red[(row, col)] = {p: 1 if p == piece else 0 for p in self.soldiers["blue"].keys()}
+    
+    def get_prob_board(self):
+        return self.prob_board_red if self.turn == "red" else self.prob_board_blue
 
     def input_pieces(self, player):
         total_pieces = sum(data["Quantity"] for data in self.soldiers[player].values())
@@ -133,8 +156,15 @@ class Stratego:
         else:
             self.board[to_row][to_col] = piece
             self.board[from_row][from_col] = "EMPTY"
+        self.update_probabilities_after_move(from_pos, to_pos)
         self.history.append((from_pos, to_pos))
         self.switch_turn()
+  
+    def update_probabilities_after_move(self, from_pos, to_pos):
+        prob_board = self.get_prob_board()
+        if self.board[from_pos] != "EMPTY":
+            prob_board[to_pos] = prob_board[from_pos]
+            prob_board[from_pos] = {p: 0 for p in prob_board[to_pos]}
 
     def unmake_move(self, move):
         """Undo the last move."""
@@ -162,6 +192,7 @@ class Stratego:
             return "Invalid attack: Same team."
         attacker_rank = self.soldiers[attacker_color][attacker]["Rank"]
         defender_rank = self.soldiers[defender_color][defender]["Rank"]
+        self.update_probabilities_after_attack(to_pos, defender, defender_color)
         if attacker_rank == 1 and defender_rank == 10:
             return "Spy defeats Marshal"
         if defender == "BOMB" and attacker != "SAPPER":
@@ -175,6 +206,12 @@ class Stratego:
         else:
             return "Draw"
 
+    def update_probabilities_after_attack(self, pos, revealed_piece, revealed_color):
+        if revealed_color == "red":
+            self.prob_board_blue[pos] = {p: 1 if p == revealed_piece else 0 for p in self.soldiers["red"].keys()}
+        else:
+            self.prob_board_red[pos] = {p: 1 if p == revealed_piece else 0 for p in self.soldiers["blue"].keys()}
+
     def is_legal_move(self, from_pos, to_pos):
         from_row, from_col = from_pos
         to_row, to_col = to_pos
@@ -187,11 +224,23 @@ class Stratego:
             return False
         if self.board[to_row][to_col] != "EMPTY" and self.board[to_row][to_col].split("_")[1] == self.turn:
             return False
-        if piece.split("_")[0] != "SCOUT" and abs(from_row - to_row) + abs(from_col - to_col) != 1:
-            return False
         if self.is_repetitive_move(from_pos, to_pos):
-            return False
-        return True
+            return False        
+        if piece.split("_")[0] == "SCOUT":
+            if from_row == to_row: 
+                step = 1 if to_col > from_col else -1
+                for col in range(from_col + step, to_col, step):
+                    if self.board[from_row][col] != "EMPTY":
+                        return False
+            elif from_col == to_col: 
+                step = 1 if to_row > from_row else -1
+                for row in range(from_row + step, to_row, step):
+                    if self.board[row][from_col] != "EMPTY":  
+                        return False
+            else:
+                return False 
+            return True 
+        return abs(from_row - to_row) + abs(from_col - to_col) == 1
 
     def is_repetitive_move(self, from_pos, to_pos):
         if len(self.history) < 7:
