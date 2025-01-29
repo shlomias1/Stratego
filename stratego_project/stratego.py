@@ -280,8 +280,7 @@ class Stratego:
         return "ongoing"
 
     def encode(self):
-        """Encode the game state as a binary vector using NumPy."""
-        vector = np.zeros((10, 10, 12), dtype=int)  # 12 סוגי חיילים
+        vector = np.zeros((10, 10, 12), dtype=int)     
         for row in range(10):
             for col in range(10):
                 cell = self.board[row, col]
@@ -290,7 +289,43 @@ class Stratego:
                     piece_index = list(self.soldiers[color].keys()).index(piece)
                     vector[row, col, piece_index] = 1
         turn_vector = np.array([1 if self.turn == "red" else 0])
-        return np.concatenate((vector.flatten(), turn_vector))
+        red_counts = np.array([self.remaining_pieces["red"][p] for p in self.soldiers["red"]])
+        blue_counts = np.array([self.remaining_pieces["blue"][p] for p in self.soldiers["blue"]])
+        last_moves = np.zeros((5, 2, 2), dtype=int)
+        for i, move in enumerate(self.history[-5:]):
+            last_moves[i] = move
+        legal_moves_matrix = np.zeros((10, 10, 4), dtype=int) 
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        for row in range(10):
+            for col in range(10):
+                if self.board[row, col] != "EMPTY" and self.board[row, col].split("_")[1] == self.turn:
+                    for d_idx, (dr, dc) in enumerate(directions):
+                        new_row, new_col = row + dr, col + dc
+                        if (0 <= new_row < 10 and 0 <= new_col < 10 and self.is_legal_move((row, col), (new_row, new_col))):
+                            legal_moves_matrix[row, col, d_idx] = 1
+        prob_board = self.prob_board_red if self.turn == "red" else self.prob_board_blue
+        prob_vector = np.array([[list(prob_board[(r, c)].values()) for c in range(10)] for r in range(10)])
+        static_pieces = np.zeros((10, 10, 1), dtype=int)
+        for row in range(10):
+            for col in range(10):
+                if self.board[row, col] in ["FLAG_red", "BOMB_red", "FLAG_blue", "BOMB_blue"]:
+                    static_pieces[row, col, 0] = 1
+        danger_map = np.zeros((10, 10, 1), dtype=int)
+        for move in self.history:
+            _, to_pos = move
+            danger_map[to_pos] += 1 
+        full_vector = np.concatenate((
+            vector.flatten(),      
+            turn_vector,          
+            red_counts,            
+            blue_counts,          
+            last_moves.flatten(),   
+            legal_moves_matrix.flatten(),  
+            prob_vector.flatten(),  
+            static_pieces.flatten(),  
+            danger_map.flatten()    
+        ))
+        return full_vector
 
     def decode(self, action_index):
         """Decode an action index into a move."""
