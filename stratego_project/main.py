@@ -2,6 +2,7 @@ from stratego import Stratego
 from mcts import MCTSPlayer
 from puct import PUCTPlayer
 from game_net import GameNetwork
+from training import PreTrain, Train
 
 def main():
     network = GameNetwork(input_dim=inputs.shape[1], policy_output_dim=len(game.legal_moves()), value_output_dim=1)
