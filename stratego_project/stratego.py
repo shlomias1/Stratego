@@ -116,23 +116,43 @@ class Stratego:
         self.board[row][col] = f"{piece_name}_{player}"
         self.pieces[player][piece_name]["quantity"] += 1
 
-    def auto_place_pieces(self):
-        """Automatically place pieces on the board using NumPy."""
-        print("Automatically placing all pieces for both players...")
-        def place_all(player, rows):
+    def auto_place_pieces_for_player(self, player):
+        print(f"Automatically placing pieces for player {player}")
+        if player not in ['red', 'blue']:
+            print("Invalid player. Choose 'red' or 'blue'.")
+            return
+        def place_piece_strategically(player, rows):
             positions = [(row, col) for row in rows for col in range(10)]
             idx = 0
             for name, data in self.soldiers[player].items():
-                for _ in range(data["Quantity"]):
-                    if idx >= len(positions):
-                        raise ValueError("Not enough positions to place all pieces.")
-                    row, col = positions[idx]
-                    self.board[row, col] = f"{name}_{player}"
-                    self.pieces[player][name]["quantity"] += 1
-                    idx += 1
-        place_all("red", range(6, 10))
-        place_all("blue", range(0, 4))
-        print("All pieces have been placed.")
+                if name == "FLAG":
+                    for _ in range(data["Quantity"]):
+                        if idx < len(positions):
+                            row, col = positions[idx]
+                            self.board[row, col] = f"{name}_{player}"
+                            self.pieces[player][name]["quantity"] += 1
+                            idx += 1
+            for name, data in self.soldiers[player].items():
+                if name == "BOMB":
+                    for _ in range(data["Quantity"]):
+                        if idx < len(positions):
+                            row, col = positions[idx]
+                            self.board[row, col] = f"{name}_{player}"
+                            self.pieces[player][name]["quantity"] += 1
+                            idx += 1
+            for name, data in self.soldiers[player].items():
+                if name != "FLAG" and name != "BOMB":
+                    for _ in range(data["Quantity"]):
+                        if idx < len(positions):
+                            row, col = positions[idx]
+                            self.board[row, col] = f"{name}_{player}"
+                            self.pieces[player][name]["quantity"] += 1
+                            idx += 1
+        if player == "red":
+            place_piece_strategically("red", range(6, 10)) 
+        elif player == "blue":
+            place_piece_strategically("blue", range(0, 4)) 
+        print(f"Pieces for player {player} have been placed.")
 
     def make_move(self, from_pos, to_pos):
         from_row, from_col = from_pos
