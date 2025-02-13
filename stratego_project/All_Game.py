@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import json
+import os
 
 class Stratego:
     def __init__(self):
@@ -721,6 +722,7 @@ class PUCTPlayer:
 class PreTrain:
     def __init__(self, num_games=10000, filename="games_data.json"):
         self.num_games = num_games
+        self.filename = filename 
 
     def generate_self_play_games(self):
         games = []
@@ -732,7 +734,7 @@ class PreTrain:
             game.auto_place_pieces_for_player("blue")  # Automatically place pieces
             game_history = []
             i = 1
-            MAX_MOVES = 500
+            MAX_MOVES = 700
             while not game.game_over:
                 if game.turn == "red":  # MCTS player (red)
                     move = mcts_player.choose_move(game)
@@ -774,18 +776,36 @@ class PreTrain:
         return np.array(inputs), np.array(policy_labels), np.array(value_labels)
 
     def save_games_data(self, games_data):
-            with open(self.filename, "w") as f:
-                json.dump(games_data, f)
-            print(f"✅ Games data saved to {self.filename}")
+        def convert_to_serializable(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist() 
+            elif isinstance(obj, list):
+                return [convert_to_serializable(item) for item in obj] 
+            elif isinstance(obj, tuple):
+                return tuple(convert_to_serializable(item) for item in obj) 
+            elif isinstance(obj, dict):
+                return {key: convert_to_serializable(value) for key, value in obj.items()} 
+            else:
+                return obj 
+        games_data_serializable = convert_to_serializable(games_data)  
+        with open(self.filename, "w") as f:
+            json.dump(games_data_serializable, f)
+        print(f"✅ Games data saved to {self.filename}")
 
     def load_games_data(self):
         try:
+            if not os.path.exists(self.filename) or os.path.getsize(self.filename) == 0:
+                print("❌ No saved games found or file is empty, generating new games...")
+                return None
             with open(self.filename, "r") as f:
                 games_data = json.load(f)
+            if not games_data:  # בודק אם הקובץ ריק
+                print("❌ Saved file is empty, generating new games...")
+                return None
             print(f"✅ Loaded {len(games_data)} games from {self.filename}")
             return games_data
-        except FileNotFoundError:
-            print("❌ No saved games found, generating new games...")
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"❌ Error loading JSON file: {e}")
             return None
         
 class Train:
@@ -826,11 +846,18 @@ class Train:
         self.network.save_model("trained_game_network.pth")
 
 def main():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("Running on GPU:", torch.cuda.get_device_name(0))
+    else:
+        device = torch.device("cpu")
+        print("Running on CPU")
     # Initialize pre-training and generate self-play games
-    pretrain = PreTrain(num_games=200)  # Reduced for quick testing
+    pretrain = PreTrain(num_games=10000)  # Reduced for quick testing
     games_data = pretrain.load_games_data()
     if not games_data:
         games_data = pretrain.generate_self_play_games()
+        pretrain.save_games_data(games_data)
     if not games_data:
         print("❌ Error: No game data generated.")
         return
