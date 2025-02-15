@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import json
 import os
+import gc
 
 class Stratego:
     def __init__(self):
@@ -367,7 +368,7 @@ class Stratego:
                 for c in range(10)
             ]
             for r in range(10)
-        ], dtype=np.float32)
+        ], dtype=np.float16)
 
         static_pieces = np.zeros((10, 10, 1), dtype=np.int8)
         for row in range(10):
@@ -726,35 +727,35 @@ class PreTrain:
 
     def generate_self_play_games(self):
         games = []
-        for _ in range(self.num_games):
+        batch_size = 20
+        for i in range(self.num_games):
             game = Stratego()
-            print(f"🔄 Generating game {len(games) + 1}/{self.num_games}...")
+            print(f"🔄 Generating game {i+1}/{self.num_games}...")
             mcts_player = MCTSPlayer(simulations=700, exploration_weight=2)
-            game.auto_place_pieces_for_player("red")  # Automatically place pieces
-            game.auto_place_pieces_for_player("blue")  # Automatically place pieces
+            game.auto_place_pieces_for_player("red")  
+            game.auto_place_pieces_for_player("blue")
             game_history = []
-            i = 1
+            move_count = 0
             MAX_MOVES = 700
             while not game.game_over:
-                if game.turn == "red":  # MCTS player (red)
-                    move = mcts_player.choose_move(game)
-                    if move is None:
-                        print("⚠️ No valid move found. Skipping turn.")
-                        break 
-                    game.make_move(*move)
-                else:  # MCTS player (blue)
-                    move = mcts_player.choose_move(game)
-                    if move is None:
-                        print("⚠️ No valid move found. Skipping turn.")
-                        break 
-                    game.make_move(*move)
-                game_history.append(game.encode())  # Store the game state
-                if i >= MAX_MOVES:
+                move = mcts_player.choose_move(game)
+                if move is None:
+                    print("⚠️ No valid move found. Skipping turn.")
+                    break  
+                game.make_move(*move)
+                game_history.append(game.encode())  
+                move_count += 1
+                if move_count >= MAX_MOVES:
                     print("🏁 Draw - you have reached the move limit!")
                     game.game_over = True
-                i = i+1
-            games.append((game_history, game.status()))  # Record game history and outcome
-        return games
+            games.append((game_history, game.status())) 
+            if (i + 1) % batch_size == 0:
+                self.save_games_data(games)
+                games.clear() 
+                gc.collect()              
+        if games:
+            self.save_games_data(games)
+        print("✅ All self-play games have been generated and saved.")
 
     def prepare_training_data(self, games_data):
         inputs = []
@@ -775,7 +776,7 @@ class PreTrain:
                 policy_labels.append(policy_probs)
         return np.array(inputs), np.array(policy_labels), np.array(value_labels)
 
-    def save_games_data(self, games_data):
+    def save_games_data(self, new_games):        
         def convert_to_serializable(obj):
             if isinstance(obj, np.ndarray):
                 return obj.tolist() 
@@ -787,10 +788,18 @@ class PreTrain:
                 return {key: convert_to_serializable(value) for key, value in obj.items()} 
             else:
                 return obj 
-        games_data_serializable = convert_to_serializable(games_data)  
-        with open(self.filename, "w") as f:
-            json.dump(games_data_serializable, f)
-        print(f"✅ Games data saved to {self.filename}")
+        filename = self.filename
+        all_games = []
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            with open(filename, "r") as f:
+                try:
+                    all_games = json.load(f)
+                except json.JSONDecodeError:
+                    print("⚠️ Warning: JSON file is corrupt. Creating a new file.")
+        all_games.extend(convert_to_serializable(new_games))
+        with open(filename, "w") as f:
+            json.dump(all_games, f)
+        print(f"✅ {len(new_games)} new games saved. Total games in file: {len(all_games)}")
 
     def load_games_data(self):
         try:
