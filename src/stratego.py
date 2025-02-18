@@ -3,11 +3,12 @@ import copy
 import re
 import random
 import math
-from utils import _get_display_piece
+from utils import _get_display_piece, swap_rows
+import config
 
 class Stratego:
     def __init__(self):
-        self.board = np.full((10, 10), "EMPTY", dtype=object)
+        self.board = np.full(config.BATCH_SIZE, "EMPTY", dtype=object)
         self.turn = 'red'
         self.history = []
         self.game_over = False
@@ -156,13 +157,9 @@ class Stratego:
                     row, col = positions.pop()
                     self.board[row, col] = f"{name}_{player}"
                     self.pieces[player][name]["quantity"] += 1
-        self.swap_rows([0, 3])
-        self.swap_rows([1, 2])
-        self.swap_rows([2, 3])
-
-    def swap_rows(self, row_indices):
-        row1, row2 = row_indices
-        self.board[row1], self.board[row2] = np.copy(self.board[row2]), np.copy(self.board[row1])
+        swap_rows(self.board,[0, 3])
+        swap_rows(self.board,[1, 2])
+        swap_rows(self.board,[2, 3])
 
     def make_move(self, from_pos, to_pos):
         attacker_piece = self.board[from_pos]
@@ -287,10 +284,14 @@ class Stratego:
         return abs(from_row - to_row) + abs(from_col - to_col) == 1
 
     def is_repetitive_move(self, from_pos, to_pos):
-        if len(self.history) < 6:
+        HISTORY_SIZE = config.HISTORY_SIZE
+        Previous_Move = HISTORY_SIZE-1
+        Move_Before = HISTORY_SIZE-3
+        Tree_Moves_Ago = HISTORY_SIZE-5
+        if len(self.history) < HISTORY_SIZE:
             return False
-        last_moves = self.history[-6:]
-        if (to_pos, from_pos) in [last_moves[1], last_moves[3], last_moves[5]]:
+        last_moves = self.history[-HISTORY_SIZE:]
+        if (to_pos, from_pos) in [last_moves[Tree_Moves_Ago], last_moves[Move_Before], last_moves[Previous_Move]]:
             return True
         return False
 
@@ -343,8 +344,9 @@ class Stratego:
         blue_counts = np.array(
             [self.soldiers["blue"][p]["Quantity"] - self.pieces["blue"][p]["quantity"]
             for p in self.soldiers["blue"]], dtype=np.uint8)
-        last_moves = np.zeros((5, 2, 2), dtype=np.int8)
-        for i, move in enumerate(self.history[-5:]):
+        HISTORY_SIZE = config.HISTORY_SIZE - 1
+        last_moves = np.zeros((HISTORY_SIZE, 2, 2), dtype=np.int8)
+        for i, move in enumerate(self.history[-HISTORY_SIZE:]):
             last_moves[i] = move
         legal_moves_matrix = np.zeros((10, 10, 4), dtype=np.int8)
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
