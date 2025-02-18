@@ -1,6 +1,7 @@
 import math
 from stratego import Stratego
 from game_net import GameNetwork
+import torch
 
 class PUCTNode:
     def __init__(self, state, parent=None, move=None, prior_prob=1.0):
