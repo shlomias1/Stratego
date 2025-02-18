@@ -4,6 +4,7 @@ import re
 import random
 import math
 from stratego import Stratego
+from utils import _create_log
 
 class MCTSNode:
     def __init__(self, state, parent=None, move=None):
@@ -79,7 +80,9 @@ class MCTSPlayer:
         root = MCTSNode(game.clone())
         for _ in range(self.simulations):
             if _ % 100 == 0:
-                print(f"🔄 Running MCTS Simulation {_}/{self.simulations}...")
+                log_msg = f"🔄 Running MCTS Simulation {_}/{self.simulations}..."
+                _create_log(log_msg, "Info","game_generation_log.txt")
+                print(log_msg)
             node = self._select(root)
             if not node:
                 continue
