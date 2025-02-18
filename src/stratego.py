@@ -8,7 +8,7 @@ import config
 
 class Stratego:
     def __init__(self):
-        self.board = np.full(config.BATCH_SIZE, "EMPTY", dtype=object)
+        self.board = np.full(config.BOARD_SIZE, "EMPTY", dtype=object)
         self.turn = 'red'
         self.history = []
         self.game_over = False
@@ -233,7 +233,6 @@ class Stratego:
             return "Invalid attack: Same team."
         attacker_rank = self.soldiers[attacker_color][attacker]["Rank"]
         defender_rank = self.soldiers[defender_color][defender]["Rank"]
-        #self.update_probabilities_after_attack(to_pos, defender, defender_color)
         if attacker_rank == 1 and defender_rank == 10:
             return "Spy defeats Marshal"
         if defender == "BOMB" and attacker != "SAPPER":
@@ -321,8 +320,9 @@ class Stratego:
             return "blue wins"
         if not blue_flag:
             return "red wins"
-        if not any("SCOUT_red" in cell or "SCOUT_blue" in cell for row in self.board for cell in row):
-            return "draw"
+        legal_moves = self.legal_moves()
+        if not legal_moves:
+            return "blue wins" if self.turn == "red" else "red wins"
         return "ongoing"
 
     def encode(self):
