@@ -8,7 +8,6 @@ from utils import Connect_CUDA, _create_log
 
 def main():
     Connect_CUDA()
-    # Initialize pre-training and generate self-play games
     pretrain = PreTrain(num_games=10000)  # Reduced for quick testing
     games_data = pretrain.load_games_data()
     if not games_data:
