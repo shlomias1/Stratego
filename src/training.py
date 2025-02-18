@@ -24,14 +24,18 @@ class PreTrain:
             log_message = f"🔄 Generating game {i+1}/{self.num_games}..."
             _create_log(log_message, "Info","game_generation_log.txt")
             print(log_message) 
-            mcts_player = MCTSPlayer(simulations = config.MCTS_SIMULATIONS, exploration_weight=config.EXPLORATION_WEIGHT)
+            # mcts_player = MCTSPlayer(simulations = config.MCTS_SIMULATIONS, exploration_weight=config.EXPLORATION_WEIGHT)
+            red_player = MCTSPlayer(simulations=config.MCTS_SIMULATIONS, exploration_weight=config.EXPLORATION_WEIGHT)
+            blue_player = MCTSPlayer(simulations=config.MCTS_SIMULATIONS, exploration_weight=config.EXPLORATION_WEIGHT)
             game.auto_place_pieces_for_player("red")  
             game.auto_place_pieces_for_player("blue")
             game_history = []
             move_count = 0
             MAX_MOVES = config.MAX_MOVES
             while not game.game_over:
-                move = mcts_player.choose_move(game)
+                # move = mcts_player.choose_move(game)
+                current_player = red_player if game.turn == "red" else blue_player
+                move = current_player.choose_move(game)
                 if move is None:
                     print("⚠️ No valid move found. Skipping turn.")
                     break  
@@ -41,6 +45,9 @@ class PreTrain:
                 if move_count >= MAX_MOVES:
                     print("🏁 Draw - you have reached the move limit!")
                     game.game_over = True
+            log_message = f"✅ game {i+1}/{self.num_games} finished - status: {game.status()}"
+            _create_log(log_message, "Info","game_generation_log.txt")
+            print(log_message)             
             games.append((game_history, game.status())) 
             if (i + 1) % batch_size == 0:
                 self.save_games_data(games)
