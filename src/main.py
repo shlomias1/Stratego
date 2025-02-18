@@ -5,10 +5,11 @@ from puct import PUCTPlayer
 from game_net import GameNetwork
 from training import PreTrain, Train
 from utils import Connect_CUDA, _create_log
+import config
 
 def main():
     Connect_CUDA()
-    pretrain = PreTrain(num_games=10000)  # Reduced for quick testing
+    pretrain = PreTrain(num_games=config.NUM_GAMES)  # Reduced for quick testing
     games_data = pretrain.load_games_data()
     if not games_data:
         games_data = pretrain.generate_self_play_games()
@@ -35,10 +36,10 @@ def main():
         print(log_message)
         return
     network = GameNetwork(input_dim=inputs.shape[1], policy_output_dim=len(policy_labels[0]) , value_output_dim=1)
-    trainer = Train(network, inputs, policy_labels, value_labels, epochs=50, batch_size=32)
+    trainer = Train(network, inputs, policy_labels, value_labels, epochs=config.EPOCHS, batch_size=config.BATCH_SIZE)
     trainer.train()
     network.load_model("trained_game_network.pth")
-    puct_player = PUCTPlayer(network, simulations=500, cpuct=1.5)
+    puct_player = PUCTPlayer(network, simulations = config.PUCT_SIMULATIONS, cpuct=1.5)
     print("🎲 Initial game board:")
     print(game)
     while not game.game_over:
