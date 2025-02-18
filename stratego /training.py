@@ -8,6 +8,7 @@ import numpy as np
 from stratego import Stratego
 from mcts import MCTSPlayer
 from game_net import GameNetwork
+from utils import _create_log
 
 class PreTrain:
     def __init__(self, num_games=10000, filename="games_data.json"):
@@ -16,10 +17,12 @@ class PreTrain:
 
     def generate_self_play_games(self):
         games = []
-        batch_size = 20
+        batch_size = 5
         for i in range(self.num_games):
             game = Stratego()
-            print(f"🔄 Generating game {i+1}/{self.num_games}...")
+            log_message = f"🔄 Generating game {i+1}/{self.num_games}..."
+            _create_log(log_message, "Info","game_generation_log.txt")
+            print(log_message) 
             mcts_player = MCTSPlayer(simulations=700, exploration_weight=2)
             game.auto_place_pieces_for_player("red")  
             game.auto_place_pieces_for_player("blue")
@@ -47,9 +50,9 @@ class PreTrain:
         print("✅ All self-play games have been generated and saved.")
 
     def prepare_training_data(self, games_data):
-        inputs = []
-        policy_labels = []
-        value_labels = []
+        inputs = np.memmap("inputs.dat", dtype="float32", mode="w+", shape=(total_games, feature_size))
+        policy_labels = np.memmap("policy_labels.dat", dtype="float32", mode="w+", shape=(total_games, policy_size))
+        value_labels = np.memmap("value_labels.dat", dtype="float32", mode="w+", shape=(total_games,))
         for game_history, outcome in games_data:
             for state_vector in game_history:
                 inputs.append(state_vector)
@@ -107,7 +110,7 @@ class PreTrain:
             return None
         
 class Train:
-    def __init__(self, network, inputs, policy_labels, value_labels, epochs=10, batch_size=32):
+    def __init__(self, network, inputs, policy_labels, value_labels, epochs=10, batch_size=16):
         self.network = network
         self.inputs = inputs
         self.policy_labels = policy_labels
@@ -121,13 +124,16 @@ class Train:
             total_correct = 0
             total_samples = 0
             for i in range(0, len(self.inputs), self.batch_size):
-                batch_inputs = torch.tensor(self.inputs[i:i+self.batch_size], dtype=torch.float32)
+                batch_inputs = torch.tensor(self.inputs[i:i+self.batch_size], dtype=torch.float32, device="cuda")
                 batch_policy_labels = torch.tensor(self.policy_labels[i:i+self.batch_size], dtype=torch.float32)
                 batch_value_labels = torch.tensor(self.value_labels[i:i+self.batch_size], dtype=torch.float32)
                 optimizer.zero_grad()
-                policy_probs, value_estimate = self.network(batch_inputs)
+                with torch.no_grad():
+                    policy_probs, value_estimate = self.network(batch_inputs)
                 if policy_probs.shape != batch_policy_labels.shape:
-                    print("❌ Error: Shape mismatch between policy_probs and batch_policy_labels!")
+                    log_msg = "Shape mismatch between policy_probs and batch_policy_labels!"
+                    _create_log(log_msg, "Error")
+                    print(log_msg)
                     return
                 policy_loss = -torch.sum(batch_policy_labels * torch.log(policy_probs)) / self.batch_size
                 value_loss = torch.mean((batch_value_labels - value_estimate) ** 2)
@@ -140,5 +146,13 @@ class Train:
                 total_correct += correct
                 total_samples += batch_policy_labels.shape[0]
             accuracy = (total_correct / total_samples) * 100
-            print(f"Epoch {epoch+1}/{self.epochs}, Loss: {loss.item():.4f}, Accuracy: {accuracy:.2f}%")
+            log_line1 = f"Epoch {epoch+1}/{self.epochs}, Loss: {loss.item():.4f}, Accuracy: {accuracy:.2f}%"
+            log_line2 = f"🔍 Memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB"
+            log_line3 = f"🔍 Memory cached: {torch.cuda.memory_reserved() / 1e9:.2f} GB"
+            _create_log(log_line1, "Info", "training_log.txt")
+            _create_log(log_line2, "Info", "training_log.txt")
+            _create_log(log_line3, "Info", "training_log.txt")
+            print(log_line1)
+            print(log_line2)
+            print(log_line3)
         self.network.save_model("trained_game_network.pth")
