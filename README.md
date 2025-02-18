@@ -1,6 +1,6 @@
 # Stratego Game
 
-This project implements a modular version of the classic board game **Stratego** in Python. The game allows players to set up their pieces, take turns moving them, and engage in battles based on predefined rules. The game supports both automatic and manual piece placement and includes an AI opponent based on **Monte Carlo Tree Search (MCTS)** and **PUCT** (Predictor Upper Confidence Bound for Trees).
+This project implements a modular version of the classic board game **Stratego** in Python. The game includes both manual and automatic piece placement and supports AI opponents using **Monte Carlo Tree Search (MCTS)** and **PUCT** (Predictor Upper Confidence Bound for Trees). Additionally, a **deep learning-based AI** is integrated using a **neural network** to enhance gameplay decision-making.
 
 ## Features
 
@@ -19,7 +19,8 @@ This project implements a modular version of the classic board game **Stratego**
 - **Victory Conditions**: A player wins by capturing the opponent's flag or eliminating all movable pieces.
 
 ### AI Opponent
-- **Monte Carlo Tree Search (MCTS)** and **PUCT** are used for AI decision-making.
+- **Monte Carlo Tree Search (MCTS)** and **PUCT** (using a neural network for policy/value estimation).
+- AI utilizes **probabilistic reasoning** to determine the best moves based on historical moves and piece rankings.
 
 ### Modes
 - **Automatic piece placement**: The game automatically places all pieces in designated rows.
@@ -32,8 +33,8 @@ The game is structured using multiple modules for clarity and maintainability:
 ### **stratego.py**
 Handles the core game logic, including:
 - **Stratego class**: Manages the game state, moves, attack resolution, and turn switching.
-- Board setup and piece placement functions.
-- Move validation and victory conditions.
+- Board setup, piece placement, and validation of legal moves.
+- Probabilistic piece tracking based on observed moves.
 
 ### **mcts.py**
 Implements the **Monte Carlo Tree Search (MCTS)** AI, including:
@@ -42,7 +43,7 @@ Implements the **Monte Carlo Tree Search (MCTS)** AI, including:
 
 ### **puct.py**
 Implements the **PUCT** AI, including:
-- **PUCTNode class**: Node in the PUCT search tree for move decision-making.
+- **PUCTNode class**: Nodes in the PUCT search tree for move decision-making.
 - **PUCTPlayer class**: AI decision-making using the PUCT algorithm, based on a neural network.
 
 ### **game_net.py**
@@ -53,22 +54,28 @@ Defines the **GameNetwork** class, which is a **neural network** used for predic
 
 ### **training.py**
 Contains the **PreTrain** and **Train** classes:
-- **PreTrain**: Generates self-play games using MCTS to collect training data.
-- **Train**: Trains the **GameNetwork** using the generated self-play games.
+- **PreTrain**: Generates self-play games using MCTS to collect training data and saves them to `games_data.json`.
+- **Train**: Trains the **GameNetwork** using the generated self-play games, logging loss and accuracy per epoch.
 
 ### **utils.py**
 Contains helper functions such as:
-- `get_display_piece()`: For visualizing the board and pieces, including water tiles.
+- `_get_display_piece()`: For visualizing the board and pieces, including water tiles.
+- `_create_log()`: Logs important game events and model training updates.
+- `Connect_CUDA()`: Manages CUDA availability and ensures the neural network runs on the GPU if available.
 
 ### **main.py**
 The entry point for the game:
-- Initializes the game and the AI player.
-- Handles user input and the gameplay loop.
+- Initializes the game, AI player, and neural network.
+- Handles user input and gameplay loop.
+- Logs game progress and training updates.
 
 ## How to Run
 
 ### Requirements
-Ensure you have **Python 3.x** installed on your system.
+Ensure you have **Python 3.x** installed on your system. Install dependencies using:
+```bash
+pip install -r requirements.txt
+```
 
 ### Running the Game
 Save all the files in the same directory and run the following command:
@@ -76,9 +83,15 @@ Save all the files in the same directory and run the following command:
 python main.py
 ```
 
-### Gameplay Instructions
+### Training the Neural Network
+To train the AI using self-play games, run:
+```bash
+python main.py --train
+```
+
+## Gameplay Instructions
 - The game starts with **automatic piece placement**.
-- To enable **manual piece placement** and play with 2 human players, edit 'main.py' and uncomment the following lines:
+- To enable **manual piece placement**, edit `main.py` and uncomment the following lines:
 ```python
 game.input_pieces('red')
 game.input_pieces('blue')
@@ -113,10 +126,20 @@ Enter the column to move to (0-9): 0
 Move executed successfully.
 ```
 
+## Logging and Debugging
+- Training logs are saved in **`training_log.txt`**.
+- Game generation logs are stored in **`game_generation_log.txt`**.
+- General logs are written to **`logs.txt`**.
+
+To monitor training and memory usage in real-time:
+```bash
+tail -f training_log.txt
+```
+
 ## Future Improvements
 - Add a **graphical interface** for a better user experience.
-- Implement a **stronger AI** using deep learning.
-- Allow **saving and loading game states**.
+- Improve **AI efficiency** with advanced deep learning techniques.
+- Implement **game state saving and loading**.
 
 ## License
 This project is open-source and available under the **MIT License**.
