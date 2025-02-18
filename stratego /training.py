@@ -8,7 +8,7 @@ import numpy as np
 from stratego import Stratego
 from mcts import MCTSPlayer
 from game_net import GameNetwork
-from utils import _create_log
+from utils import _create_log, Connect_CUDA
 
 class PreTrain:
     def __init__(self, num_games=10000, filename="games_data.json"):
@@ -23,7 +23,7 @@ class PreTrain:
             log_message = f"🔄 Generating game {i+1}/{self.num_games}..."
             _create_log(log_message, "Info","game_generation_log.txt")
             print(log_message) 
-            mcts_player = MCTSPlayer(simulations=700, exploration_weight=2)
+            mcts_player = MCTSPlayer(simulations=600, exploration_weight=2)
             game.auto_place_pieces_for_player("red")  
             game.auto_place_pieces_for_player("blue")
             game_history = []
@@ -50,9 +50,12 @@ class PreTrain:
         print("✅ All self-play games have been generated and saved.")
 
     def prepare_training_data(self, games_data):
-        inputs = np.memmap("inputs.dat", dtype="float32", mode="w+", shape=(total_games, feature_size))
-        policy_labels = np.memmap("policy_labels.dat", dtype="float32", mode="w+", shape=(total_games, policy_size))
-        value_labels = np.memmap("value_labels.dat", dtype="float32", mode="w+", shape=(total_games,))
+        total_games = len(games_data)
+        feature_size = len(games_data[0][0])
+        policy_size = len(game_history[0])
+        inputs = np.memmap("inputs.dat", dtype="float16", mode="w+", shape=(total_games, feature_size))
+        policy_labels = np.memmap("policy_labels.dat", dtype="float16", mode="w+", shape=(total_games, policy_size))
+        value_labels = np.memmap("value_labels.dat", dtype="float16", mode="w+", shape=(total_games,))
         for game_history, outcome in games_data:
             for state_vector in game_history:
                 inputs.append(state_vector)
@@ -81,32 +84,49 @@ class PreTrain:
             else:
                 return obj 
         filename = self.filename
-        all_games = []
-        if os.path.exists(filename) and os.path.getsize(filename) > 0:
-            with open(filename, "r") as f:
-                try:
-                    all_games = json.load(f)
-                except json.JSONDecodeError:
-                    print("⚠️ Warning: JSON file is corrupt. Creating a new file.")
-        all_games.extend(convert_to_serializable(new_games))
-        with open(filename, "w") as f:
-            json.dump(all_games, f)
-        print(f"✅ {len(new_games)} new games saved. Total games in file: {len(all_games)}")
+        if not new_games:
+            log_msg = "⚠️ No new games to save. Skipping write operation."
+            _create_log(log_msg, "Warning", "game_generation_log.txt")
+            print(log_msg)
+            return
+        with open(filename, "a") as f:
+            for game in new_games:
+                f.write(json.dumps(convert_to_serializable(game)) + "\n")    
+        num_saved_games = len(new_games)
+        new_games.clear()
+        gc.collect() 
+        log_msg = f"✅ {num_saved_games} new games saved in append mode. Memory cleared."
+        _create_log(log_msg, "Info", "game_generation_log.txt")
+        print(log_msg)
 
     def load_games_data(self):
+        filename = self.filename
+        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+            log_message = "❌ No saved games found or file is empty, generating new games..."
+            _create_log(log_message, "Warning")
+            print(log_message)
+            return None
+        games_data = []
         try:
-            if not os.path.exists(self.filename) or os.path.getsize(self.filename) == 0:
-                print("❌ No saved games found or file is empty, generating new games...")
+            with open(filename, "r") as f:
+                for line_number, line in enumerate(f, start=1):
+                    try:
+                        games_data.append(json.loads(line.strip())) 
+                    except json.JSONDecodeError as e:
+                        log_msg = f"⚠️ Skipping corrupted line {line_number}: {e}"
+                        _create_log(log_msg, "Warning")
+                        print(log_msg)
+            if not games_data:
+                log_msg = "❌ Saved file is empty or all lines were corrupted."
+                _create_log(log_msg, "Warning")
+                print(log_msg)
                 return None
-            with open(self.filename, "r") as f:
-                games_data = json.load(f)
-            if not games_data: 
-                print("❌ Saved file is empty, generating new games...")
-                return None
-            print(f"✅ Loaded {len(games_data)} games from {self.filename}")
+            print(f"✅ Loaded {len(games_data)} games from {filename}")
             return games_data
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"❌ Error loading JSON file: {e}")
+        except Exception as e:
+            log_msg = f"❌ Error opening JSON file: {e}"
+            _create_log(log_msg, "Error")
+            print(log_msg)
             return None
         
 class Train:
@@ -119,14 +139,15 @@ class Train:
         self.batch_size = batch_size
 
     def train(self):
+        device = Connect_CUDA()
         optimizer = optim.Adam(self.network.parameters(), lr=0.001)
         for epoch in range(self.epochs):
             total_correct = 0
             total_samples = 0
             for i in range(0, len(self.inputs), self.batch_size):
-                batch_inputs = torch.tensor(self.inputs[i:i+self.batch_size], dtype=torch.float32, device="cuda")
-                batch_policy_labels = torch.tensor(self.policy_labels[i:i+self.batch_size], dtype=torch.float32)
-                batch_value_labels = torch.tensor(self.value_labels[i:i+self.batch_size], dtype=torch.float32)
+                batch_inputs = torch.tensor(self.inputs[i:i+self.batch_size], dtype=torch.float16, device=device)
+                batch_policy_labels = torch.tensor(self.policy_labels[i:i+self.batch_size], dtype=torch.float16)
+                batch_value_labels = torch.tensor(self.value_labels[i:i+self.batch_size], dtype=torch.float16)
                 optimizer.zero_grad()
                 with torch.no_grad():
                     policy_probs, value_estimate = self.network(batch_inputs)
@@ -155,4 +176,5 @@ class Train:
             print(log_line1)
             print(log_line2)
             print(log_line3)
+            torch.cuda.empty_cache()
         self.network.save_model("trained_game_network.pth")
