@@ -84,7 +84,7 @@ class PUCTPlayer:
         Perform PUCT search and choose the best move.
         """
         root = PUCTNode(game.clone())
-        state_tensor = torch.tensor(game.encode(), dtype=torch.float32).unsqueeze(0)
+        state_tensor = torch.tensor(game.encode(), dtype=torch.float16).unsqueeze(0)
         policy_probs, value_estimate = self.network(state_tensor)
         legal_moves = game.legal_moves()
         policy_dict = {move: policy_probs[0][idx].item() for idx, move in enumerate(legal_moves)}
@@ -105,7 +105,7 @@ class PUCTPlayer:
 
     def _evaluate(self, node):
         """ Evaluate a leaf node using the neural network. return: Value estimate (-1 to 1) """
-        state_tensor = torch.tensor(node.state.encode(), dtype=torch.float32).unsqueeze(0)
+        state_tensor = torch.tensor(node.state.encode(), dtype=torch.float16).unsqueeze(0)
         _, value_estimate = self.network(state_tensor)
         return value_estimate.item()
 
