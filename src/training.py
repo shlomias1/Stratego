@@ -9,6 +9,7 @@ from stratego import Stratego
 from mcts import MCTSPlayer
 from game_net import GameNetwork
 from utils import _create_log, Connect_CUDA
+import config
 
 class PreTrain:
     def __init__(self, num_games=10000, filename="games_data.json"):
@@ -23,12 +24,12 @@ class PreTrain:
             log_message = f"🔄 Generating game {i+1}/{self.num_games}..."
             _create_log(log_message, "Info","game_generation_log.txt")
             print(log_message) 
-            mcts_player = MCTSPlayer(simulations=600, exploration_weight=2)
+            mcts_player = MCTSPlayer(simulations = config.MCTS_SIMULATIONS, exploration_weight=config.EXPLORATION_WEIGHT)
             game.auto_place_pieces_for_player("red")  
             game.auto_place_pieces_for_player("blue")
             game_history = []
             move_count = 0
-            MAX_MOVES = 700
+            MAX_MOVES = config.MAX_MOVES
             while not game.game_over:
                 move = mcts_player.choose_move(game)
                 if move is None:
@@ -140,7 +141,7 @@ class Train:
 
     def train(self):
         device = Connect_CUDA()
-        optimizer = optim.Adam(self.network.parameters(), lr=0.001)
+        optimizer = optim.Adam(self.network.parameters(), lr=config.LEARNING_RATE)
         for epoch in range(self.epochs):
             total_correct = 0
             total_samples = 0
