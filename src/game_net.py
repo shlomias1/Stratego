@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from config import HIDDEN_LAYER_SIZE
 
 class GameNetwork(nn.Module):
-    def __init__(self, input_dim, policy_output_dim, value_output_dim=1, hidden_dim=256):
+    def __init__(self, input_dim, policy_output_dim, value_output_dim = 1, hidden_dim = HIDDEN_LAYER_SIZE):
         """
         Neural network for predicting policy (best move) and value (win probability)
         :param input_dim: Size of input feature vector (output of `encode`)
