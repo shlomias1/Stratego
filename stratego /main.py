@@ -21,7 +21,9 @@ def main():
         return
     inputs, policy_labels, value_labels = pretrain.prepare_training_data(games_data)
     if inputs is None or policy_labels is None or value_labels is None:
-        print("Error: Training data was not prepared correctly.")
+        log_message = "Training data was not prepared correctly."
+        _create_log(log_message, "Error")
+        print(log_message)
         return
     game = Stratego()
     print("🛠 Automatically placing pieces for both players...")
@@ -29,7 +31,9 @@ def main():
     game.auto_place_pieces_for_player("red")
     legal_moves = game.legal_moves()
     if not legal_moves:
-        print("❌ Error: No legal moves available at the start of the game.")
+        log_message = "No legal moves available at the start of the game."
+        _create_log(log_message, "Error")
+        print(log_message)
         return
     network = GameNetwork(input_dim=inputs.shape[1], policy_output_dim=len(policy_labels[0]) , value_output_dim=1)
     trainer = Train(network, inputs, policy_labels, value_labels, epochs=50, batch_size=32)
