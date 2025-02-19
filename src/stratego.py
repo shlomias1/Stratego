@@ -326,11 +326,9 @@ class Stratego:
         return "ongoing"
 
     def encode(self):
-        """Encode the board state into a NumPy vector for faster processing."""
+        """Encode the board state into a NumPy vector for faster processing."""        
         vector = np.zeros((10, 10, 12), dtype=np.uint8)
-        piece_to_index = {
-            name: idx for idx, name in enumerate(self.soldiers["red"].keys())
-        }
+        piece_to_index = {name: idx for idx, name in enumerate(self.soldiers["red"].keys())}
         for row in range(10):
             for col in range(10):
                 cell = self.board[row, col]
@@ -338,55 +336,25 @@ class Stratego:
                     piece, color = cell.split("_")
                     vector[row, col, piece_to_index[piece]] = 1
         turn_vector = np.array([1 if self.turn == "red" else 0], dtype=np.uint8)
-        red_counts = np.array(
-            [self.soldiers["red"][p]["Quantity"] - self.pieces["red"][p]["quantity"]
-            for p in self.soldiers["red"]], dtype=np.uint8)
-        blue_counts = np.array(
-            [self.soldiers["blue"][p]["Quantity"] - self.pieces["blue"][p]["quantity"]
-            for p in self.soldiers["blue"]], dtype=np.uint8)
         HISTORY_SIZE = config.HISTORY_SIZE - 1
         last_moves = np.zeros((HISTORY_SIZE, 2, 2), dtype=np.int8)
         for i, move in enumerate(self.history[-HISTORY_SIZE:]):
             last_moves[i] = move
-        legal_moves_matrix = np.zeros((10, 10, 4), dtype=np.int8)
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for row in range(10):
-            for col in range(10):
-                if self.board[row, col] != "EMPTY" and self.board[row, col].split("_")[1] == self.turn:
-                    for d_idx, (dr, dc) in enumerate(directions):
-                        new_row, new_col = row + dr, col + dc
-                        if 0 <= new_row < 10 and 0 <= new_col < 10 and self.is_legal_move((row, col), (new_row, new_col)):
-                            legal_moves_matrix[row, col, d_idx] = 1
         prob_board = self.prob_board_red if self.turn == "red" else self.prob_board_blue
         piece_list = list(self.soldiers["red"].keys())
         prob_vector = np.array([
             [
-                [prob_board.get((r, c), {}).get(p, 0.0) for p in piece_list]
+                [int(prob_board.get((r, c), {}).get(p, 0.0) * 255) for p in piece_list]
                 for c in range(10)
             ]
             for r in range(10)
-        ], dtype=np.float16)
-
-        static_pieces = np.zeros((10, 10, 1), dtype=np.int8)
-        for row in range(10):
-            for col in range(10):
-                if self.board[row, col] in ["FLAG_red", "BOMB_red", "FLAG_blue", "BOMB_blue"]:
-                    static_pieces[row, col, 0] = 1
-        # danger_map = np.zeros((10, 10, 1), dtype=np.int8)
-        # for move in self.history:
-        #     _, to_pos = move
-        #     danger_map[to_pos] += 1
+        ], dtype=np.uint8)
         full_vector = np.concatenate((
-            vector.flatten(), # 10x10 matrix with 12 channels for storing tool information
-            turn_vector, # Current turn (1 if red, 0 if blue)
-            red_counts, # The amount of pieces left for the red player
-            blue_counts, # The amount of pieces left for the blue player
-            last_moves.flatten(), # The last five moves
-            legal_moves_matrix.flatten(), # A matrix for storing legal moves for each square
-            prob_vector.flatten(), # Probability matrix for each slot
-            static_pieces.flatten() # A matrix indicating static tools such as flags and bombs
-            #danger_map.flatten() # A matrix marking "dangerous" slots where recent attacks have occurred
-        ))
+            vector.flatten(), # Represent the state of the board
+            turn_vector, # player's turn
+            last_moves.flatten(), # Move history
+            prob_vector.flatten() # Probabilities for invisible tools
+        )).astype(np.uint8) 
         return full_vector
 
     def decode(self, action_index):
