@@ -372,7 +372,7 @@ class Stratego:
         board_representation += "   " + "-" * 31 + "\n"
         for row_idx in range(10):
             row_str = f"{row_idx:2} | " + " | ".join(
-                [_get_display_piece(self.board[row_idx, col_idx], row_idx, col_idx) for col_idx in range(10)]
+                [_get_display_piece(self.board[row_idx, col_idx], row_idx, col_idx, self.water, self.turn) for col_idx in range(10)]
             )
             board_representation += row_str + "\n" + "   " + "-" * 31 + "\n"
         return board_representation
