@@ -13,8 +13,6 @@ class GameNetwork(nn.Module):
         :param hidden_dim: Number of neurons in hidden layers
         """
         super(GameNetwork, self).__init__()
-
-        # Common feature extractor (shared layers)
         self.feature_extractor = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
